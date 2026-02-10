@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+.env
+
+# OS / editor
+.DS_Store
+.vscode/
+.idea/
+
+# Outputs / checkpoints
+runs/
+*.pt
+*.pth
+*.ckpt
+
+# Figures (optional: keep if you want)
+# viz/
