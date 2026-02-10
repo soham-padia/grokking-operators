@@ -10,10 +10,13 @@ __pycache__/
 .idea/
 
 # Outputs / checkpoints
-runs/
+runs/*
+!runs/**/
+!runs/**/viz/
+!runs/**/viz/**
+
 *.pt
 *.pth
 *.ckpt
 
-# Figures (optional: keep if you want)
-# viz/
+
