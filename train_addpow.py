@@ -31,10 +31,36 @@ class Config:
     eval_every: int = 2000
     eval_batches: int = 50  # accuracy estimate batches
 
+def save_checkpoint(path, model, opt, cfg, history):
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    torch.save(
+        {
+            "state_dict": model.state_dict(),
+            "opt_state": opt.state_dict(),
+            "cfg": cfg.__dict__,
+            "history": history,
+        },
+        path,
+    )
+
+def load_checkpoint(path, model, opt, device):
+    ckpt = torch.load(path, map_location=device)
+
+    model.load_state_dict(ckpt["state_dict"])
+
+    if opt is not None and "opt_state" in ckpt:
+        opt.load_state_dict(ckpt["opt_state"])
+
+    history = ckpt.get("history", {"step": [], "train_acc": [], "test_acc": [], "loss": []})
+    start_step = history["step"][-1] if history.get("step") else 0
+
+    return start_step, history
 
 def get_device() -> torch.device:
     if torch.backends.mps.is_available():
         return torch.device("mps")
+    if torch.cuda.is_available():
+        return torch.device("cuda")
     return torch.device("cpu")
 
 
@@ -215,8 +241,13 @@ def main():
     opt = torch.optim.AdamW(model.parameters(), lr=cfg.lr, weight_decay=cfg.weight_decay)
 
     history = {"step": [], "train_acc": [], "test_acc": [], "loss": []}
+    start_step = 0
 
-    pbar = tqdm(range(1, cfg.steps + 1))
+    if os.path.exists(ckpt_path):
+        start_step, history = load_checkpoint(ckpt_path, model, opt, device)
+        print(f"Resuming from step {start_step}")
+
+    pbar = tqdm(range(start_step + 1, cfg.steps + 1))
     for step in pbar:
         model.train()
         xb, yb = batch_from_tensor_dataset(x_train, y_train, cfg.batch_size, device)
@@ -237,7 +268,7 @@ def main():
             history["test_acc"].append(test_acc)
             history["loss"].append(loss.item())
 
-            save_checkpoint(ckpt_path, model, cfg, history)
+            save_checkpoint(ckpt_path, model, opt, cfg, history)
             pbar.set_description(
                 f"step={step} loss={loss.item():.4f} train={train_acc:.3f} test={test_acc:.3f}"
             )
