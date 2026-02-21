@@ -1,0 +1,126 @@
+Host: c2205
+Python: /home/padia.so/Workspace/grokking-operators/.venv/bin/python
+Python 3.9.18
+Fri Feb 20 23:57:38 2026       
++---------------------------------------------------------------------------------------+
+| NVIDIA-SMI 545.23.08              Driver Version: 545.23.08    CUDA Version: 12.3     |
+|-----------------------------------------+----------------------+----------------------+
+| GPU  Name                 Persistence-M | Bus-Id        Disp.A | Volatile Uncorr. ECC |
+| Fan  Temp   Perf          Pwr:Usage/Cap |         Memory-Usage | GPU-Util  Compute M. |
+|                                         |                      |               MIG M. |
+|=========================================+======================+======================|
+|   0  Tesla V100-PCIE-32GB           On  | 00000000:41:00.0 Off |                    0 |
+| N/A   40C    P0              27W / 250W |      0MiB / 32768MiB |      0%      Default |
+|                                         |                      |                  N/A |
++-----------------------------------------+----------------------+----------------------+
+                                                                                         
++---------------------------------------------------------------------------------------+
+| Processes:                                                                            |
+|  GPU   GI   CI        PID   Type   Process name                            GPU Memory |
+|        ID   ID                                                             Usage      |
+|=======================================================================================|
+|  No running processes found                                                           |
++---------------------------------------------------------------------------------------+
+Using device: cuda
+Dataset sizes: train=273806 test=638867
+Resuming from step 2000
+[saved] runs/add3_p97_tf0.3_wd0.1/checkpoint.pt
+[saved] runs/add3_p97_tf0.3_wd0.1/checkpoint.pt
+[saved] runs/add3_p97_tf0.3_wd0.1/checkpoint.pt
+[saved] runs/add3_p97_tf0.3_wd0.1/checkpoint.pt
+[saved] runs/add3_p97_tf0.3_wd0.1/checkpoint.pt
+[saved] runs/add3_p97_tf0.3_wd0.1/checkpoint.pt
+[saved] runs/add3_p97_tf0.3_wd0.1/checkpoint.pt
+[saved] runs/add3_p97_tf0.3_wd0.1/checkpoint.pt
+[saved] runs/add3_p97_tf0.3_wd0.1/checkpoint.pt
+[saved] runs/add3_p97_tf0.3_wd0.1/checkpoint.pt
+[saved] runs/add3_p97_tf0.3_wd0.1/checkpoint.pt
+[saved] runs/add3_p97_tf0.3_wd0.1/checkpoint.pt
+[saved] runs/add3_p97_tf0.3_wd0.1/checkpoint.pt
+[saved] runs/add3_p97_tf0.3_wd0.1/checkpoint.pt
+[saved] runs/add3_p97_tf0.3_wd0.1/checkpoint.pt
+[saved] runs/add3_p97_tf0.3_wd0.1/checkpoint.pt
+[saved] runs/add3_p97_tf0.3_wd0.1/checkpoint.pt
+[saved] runs/add3_p97_tf0.3_wd0.1/checkpoint.pt
+[saved] runs/add3_p97_tf0.3_wd0.1/checkpoint.pt
+[saved] runs/add3_p97_tf0.3_wd0.1/checkpoint.pt
+[saved] runs/add3_p97_tf0.3_wd0.1/checkpoint.pt
+[saved] runs/add3_p97_tf0.3_wd0.1/checkpoint.pt
+[saved] runs/add3_p97_tf0.3_wd0.1/checkpoint.pt
+[saved] runs/add3_p97_tf0.3_wd0.1/checkpoint.pt
+[saved] runs/add3_p97_tf0.3_wd0.1/checkpoint.pt
+[saved] runs/add3_p97_tf0.3_wd0.1/checkpoint.pt
+[saved] runs/add3_p97_tf0.3_wd0.1/checkpoint.pt
+[saved] runs/add3_p97_tf0.3_wd0.1/checkpoint.pt
+[saved] runs/add3_p97_tf0.3_wd0.1/checkpoint.pt
+[saved] runs/add3_p97_tf0.3_wd0.1/checkpoint.pt
+[saved] runs/add3_p97_tf0.3_wd0.1/checkpoint.pt
+[saved] runs/add3_p97_tf0.3_wd0.1/checkpoint.pt
+[saved] runs/add3_p97_tf0.3_wd0.1/checkpoint.pt
+[saved] runs/add3_p97_tf0.3_wd0.1/checkpoint.pt
+[saved] runs/add3_p97_tf0.3_wd0.1/checkpoint.pt
+[saved] runs/add3_p97_tf0.3_wd0.1/checkpoint.pt
+[saved] runs/add3_p97_tf0.3_wd0.1/checkpoint.pt
+[saved] runs/add3_p97_tf0.3_wd0.1/checkpoint.pt
+[saved] runs/add3_p97_tf0.3_wd0.1/checkpoint.pt
+[saved] runs/add3_p97_tf0.3_wd0.1/checkpoint.pt
+[saved] runs/add3_p97_tf0.3_wd0.1/checkpoint.pt
+[saved] runs/add3_p97_tf0.3_wd0.1/checkpoint.pt
+[saved] runs/add3_p97_tf0.3_wd0.1/checkpoint.pt
+[saved] runs/add3_p97_tf0.3_wd0.1/checkpoint.pt
+[saved] runs/add3_p97_tf0.3_wd0.1/checkpoint.pt
+[saved] runs/add3_p97_tf0.3_wd0.1/checkpoint.pt
+[saved] runs/add3_p97_tf0.3_wd0.1/checkpoint.pt
+[saved] runs/add3_p97_tf0.3_wd0.1/checkpoint.pt
+[saved] runs/add3_p97_tf0.3_wd0.1/checkpoint.pt
+[saved] runs/add3_p97_tf0.3_wd0.1/checkpoint.pt
+[saved] runs/add3_p97_tf0.3_wd0.1/checkpoint.pt
+[saved] runs/add3_p97_tf0.3_wd0.1/checkpoint.pt
+[saved] runs/add3_p97_tf0.3_wd0.1/checkpoint.pt
+[saved] runs/add3_p97_tf0.3_wd0.1/checkpoint.pt
+[saved] runs/add3_p97_tf0.3_wd0.1/checkpoint.pt
+[saved] runs/add3_p97_tf0.3_wd0.1/checkpoint.pt
+[saved] runs/add3_p97_tf0.3_wd0.1/checkpoint.pt
+[saved] runs/add3_p97_tf0.3_wd0.1/checkpoint.pt
+[saved] runs/add3_p97_tf0.3_wd0.1/checkpoint.pt
+[saved] runs/add3_p97_tf0.3_wd0.1/checkpoint.pt
+[saved] runs/add3_p97_tf0.3_wd0.1/checkpoint.pt
+[saved] runs/add3_p97_tf0.3_wd0.1/checkpoint.pt
+[saved] runs/add3_p97_tf0.3_wd0.1/checkpoint.pt
+[saved] runs/add3_p97_tf0.3_wd0.1/checkpoint.pt
+[saved] runs/add3_p97_tf0.3_wd0.1/checkpoint.pt
+[saved] runs/add3_p97_tf0.3_wd0.1/checkpoint.pt
+[saved] runs/add3_p97_tf0.3_wd0.1/checkpoint.pt
+[saved] runs/add3_p97_tf0.3_wd0.1/checkpoint.pt
+[saved] runs/add3_p97_tf0.3_wd0.1/checkpoint.pt
+[saved] runs/add3_p97_tf0.3_wd0.1/checkpoint.pt
+[saved] runs/add3_p97_tf0.3_wd0.1/checkpoint.pt
+[saved] runs/add3_p97_tf0.3_wd0.1/checkpoint.pt
+[saved] runs/add3_p97_tf0.3_wd0.1/checkpoint.pt
+[saved] runs/add3_p97_tf0.3_wd0.1/checkpoint.pt
+[saved] runs/add3_p97_tf0.3_wd0.1/checkpoint.pt
+[saved] runs/add3_p97_tf0.3_wd0.1/checkpoint.pt
+[saved] runs/add3_p97_tf0.3_wd0.1/checkpoint.pt
+[saved] runs/add3_p97_tf0.3_wd0.1/checkpoint.pt
+[saved] runs/add3_p97_tf0.3_wd0.1/checkpoint.pt
+[saved] runs/add3_p97_tf0.3_wd0.1/checkpoint.pt
+[saved] runs/add3_p97_tf0.3_wd0.1/checkpoint.pt
+[saved] runs/add3_p97_tf0.3_wd0.1/checkpoint.pt
+[saved] runs/add3_p97_tf0.3_wd0.1/checkpoint.pt
+[saved] runs/add3_p97_tf0.3_wd0.1/checkpoint.pt
+[saved] runs/add3_p97_tf0.3_wd0.1/checkpoint.pt
+[saved] runs/add3_p97_tf0.3_wd0.1/checkpoint.pt
+[saved] runs/add3_p97_tf0.3_wd0.1/checkpoint.pt
+[saved] runs/add3_p97_tf0.3_wd0.1/checkpoint.pt
+[saved] runs/add3_p97_tf0.3_wd0.1/checkpoint.pt
+[saved] runs/add3_p97_tf0.3_wd0.1/checkpoint.pt
+[saved] runs/add3_p97_tf0.3_wd0.1/checkpoint.pt
+[saved] runs/add3_p97_tf0.3_wd0.1/checkpoint.pt
+[saved] runs/add3_p97_tf0.3_wd0.1/checkpoint.pt
+[saved] runs/add3_p97_tf0.3_wd0.1/checkpoint.pt
+[saved] runs/add3_p97_tf0.3_wd0.1/checkpoint.pt
+[saved] runs/add3_p97_tf0.3_wd0.1/checkpoint.pt
+[saved] runs/add3_p97_tf0.3_wd0.1/checkpoint.pt
+[saved] runs/add3_p97_tf0.3_wd0.1/checkpoint.pt
+[saved] runs/add3_p97_tf0.3_wd0.1/checkpoint.pt
+Done.

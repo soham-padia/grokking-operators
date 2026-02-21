@@ -28,13 +28,15 @@ class Config:
     # opt
     lr: float = 3e-4
     weight_decay: float = 1e-1
-    steps: int = 200_000
+    steps: int = 1_000_000
     eval_every: int = 2000
     eval_batches: int = 50  # accuracy estimate batches
 
     # training speed
     use_amp: bool = True
     use_compile: bool = False
+    perfect_acc_target: float = 1.0
+    perfect_patience_steps: int = 10_000
 
 def save_checkpoint(path, model, opt, cfg, history):
     os.makedirs(os.path.dirname(path), exist_ok=True)
@@ -262,6 +264,8 @@ def main():
 
     run_dir = f"runs/addpow_p{cfg.p}_cmax{cfg.c_max}_tf{cfg.train_frac}_wd{cfg.weight_decay}"
     ckpt_path = os.path.join(run_dir, "checkpoint.pt")
+    done_path = os.path.join(run_dir, "SOLVED_DONE")
+    max_steps_path = os.path.join(run_dir, "MAX_STEPS_REACHED")
     os.makedirs(run_dir, exist_ok=True)
 
     # ---- Build dataset ONCE (fast training afterwards)
@@ -274,6 +278,13 @@ def main():
     history = {"step": [], "train_acc": [], "test_acc": [], "loss": []}
     start_step = 0
 
+    if os.path.exists(done_path):
+        print(f"Already solved. Found marker: {done_path}")
+        return
+    if os.path.exists(max_steps_path):
+        print(f"Hard max steps already reached. Found marker: {max_steps_path}")
+        return
+
     if device.type == "cuda":
         torch.backends.cuda.matmul.allow_tf32 = True
         torch.backends.cudnn.allow_tf32 = True
@@ -285,6 +296,13 @@ def main():
     if os.path.exists(ckpt_path):
         start_step, history = load_checkpoint(ckpt_path, model, opt, device)
         print(f"Resuming from step {start_step}")
+    if start_step >= cfg.steps:
+        with open(max_steps_path, "w") as f:
+            f.write(f"max_steps={cfg.steps}\n")
+            f.write(f"last_step={start_step}\n")
+        print(f"Reached hard max steps ({cfg.steps}). Wrote {max_steps_path}")
+        return
+    history.setdefault("consec_perfect_steps", 0)
 
     if cfg.use_compile and device.type == "cuda":
         if can_use_torch_compile():
@@ -321,18 +339,31 @@ def main():
             history["test_acc"].append(test_acc)
             history["loss"].append(loss.item())
 
+            if train_acc >= cfg.perfect_acc_target and test_acc >= cfg.perfect_acc_target:
+                history["consec_perfect_steps"] += cfg.eval_every
+            else:
+                history["consec_perfect_steps"] = 0
+
             save_checkpoint(ckpt_path, model, opt, cfg, history)
             pbar.set_description(
                 f"step={step} loss={loss.item():.4f} train={train_acc:.3f} test={test_acc:.3f}"
             )
             print(f"[saved] {ckpt_path}")
-
-            # Optional early stop if fully solved
-            if test_acc > 0.999:
-                print("Test ~1.0, stopping.")
+            if history["consec_perfect_steps"] >= cfg.perfect_patience_steps:
+                with open(done_path, "w") as f:
+                    f.write(f"solved_step={step}\n")
+                    f.write(f"train_acc={train_acc:.6f}\n")
+                    f.write(f"test_acc={test_acc:.6f}\n")
+                    f.write(f"consec_perfect_steps={history['consec_perfect_steps']}\n")
+                print(f"Solved for >= {cfg.perfect_patience_steps} continuous steps. Wrote {done_path}")
                 break
 
     print("Done.")
+    if not os.path.exists(done_path) and history.get("step") and history["step"][-1] >= cfg.steps:
+        with open(max_steps_path, "w") as f:
+            f.write(f"max_steps={cfg.steps}\n")
+            f.write(f"last_step={history['step'][-1]}\n")
+        print(f"Reached hard max steps ({cfg.steps}). Wrote {max_steps_path}")
 
 
 if __name__ == "__main__":
