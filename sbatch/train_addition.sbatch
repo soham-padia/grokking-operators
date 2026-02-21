@@ -5,11 +5,17 @@
 #SBATCH --mem=32G
 #SBATCH --time=04:00:00
 #SBATCH --job-name=train_addition
-#SBATCH --output=logs/%x-%j.out
+#SBATCH --chdir=/home/padia.so/Workspace/grokking-operators
+#SBATCH --output=/home/padia.so/Workspace/grokking-operators/logs/%x-%j.out
+#SBATCH --error=/home/padia.so/Workspace/grokking-operators/logs/%x-%j.err
 
+set -euo pipefail
 source ~/.bashrc
 source /home/padia.so/Workspace/grokking-operators/.venv/bin/activate
 
-cd /home/padia.so/Workspace/grokking-operators
 mkdir -p logs
+echo "Host: $(hostname)"
+echo "Python: $(which python)"
+python -V
+nvidia-smi || true
 python train_addition.py
