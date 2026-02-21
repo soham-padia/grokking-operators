@@ -1,5 +1,6 @@
 #!/bin/bash
 #SBATCH --partition=gpu
+#SBATCH --gres=gpu:v100-pcie:1
 #SBATCH --cpus-per-task=2
 #SBATCH --mem=8G
 #SBATCH --time=00:30:00
