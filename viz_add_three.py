@@ -1,4 +1,5 @@
 import glob
+import math
 import os
 
 import matplotlib
@@ -52,6 +53,11 @@ def savefig(path: str):
     plt.tight_layout()
     plt.savefig(path, dpi=200)
     plt.close()
+
+
+def fft_energy_1d(signal):
+    spec = torch.fft.rfft(signal)
+    return torch.abs(spec)
 
 
 def _try_load_state_dict(model, state_dict):
@@ -201,6 +207,64 @@ def plot_accuracy_vs_c(model, p, outdir, device):
             f.write(f"c={c}\tacc={acc:.6f}\n")
 
 
+def plot_embedding_fourier(model, outdir):
+    E = model.tok_emb.weight.detach().to("cpu").float()
+    var = E.var(dim=0)
+    top = torch.topk(var, k=min(4, E.shape[1])).indices.tolist()
+
+    for dim in top:
+        mag = fft_energy_1d(E[:, dim])
+        plt.figure()
+        plt.plot(mag.numpy())
+        plt.title(f"FFT magnitude of embedding dim {dim}")
+        plt.xlabel("frequency (rfft bin)")
+        plt.ylabel("magnitude")
+        savefig(os.path.join(outdir, f"08_fft_dim_{dim}.png"))
+
+def plot_fourier_circles(model, outdir):
+    E = model.tok_emb.weight.detach().to("cpu").float()
+    var = E.var(dim=0)
+    top = torch.topk(var, k=min(4, E.shape[1])).indices.tolist()
+
+    for dim in top:
+        sig = E[:, dim] - E[:, dim].mean()
+        coeff = torch.fft.rfft(sig)
+        mags = torch.abs(coeff)
+        phases = torch.angle(coeff)
+
+        n_keep = min(8, max(0, coeff.shape[0] - 1))
+        if n_keep == 0:
+            continue
+        non_dc = torch.arange(1, coeff.shape[0])
+        top_h = non_dc[torch.topk(mags[1:], k=n_keep).indices]
+
+        plt.figure(figsize=(6, 6))
+        ax = plt.gca()
+        ax.set_aspect("equal", adjustable="box")
+        ax.axhline(0.0, linewidth=0.8)
+        ax.axvline(0.0, linewidth=0.8)
+
+        max_r = float(mags[top_h].max().item()) if top_h.numel() > 0 else 1.0
+        lim = max(1e-6, 1.2 * max_r)
+
+        for k in top_h.tolist():
+            r = float(mags[k].item())
+            th = float(phases[k].item())
+            x = r * math.cos(th)
+            y = r * math.sin(th)
+            ax.add_patch(plt.Circle((0.0, 0.0), r, fill=False, linewidth=0.8, alpha=0.18))
+            ax.plot([0.0, x], [0.0, y], linewidth=1.4)
+            ax.scatter([x], [y], s=18)
+            ax.text(x, y, f" k={k}", fontsize=8)
+
+        ax.set_xlim(-lim, lim)
+        ax.set_ylim(-lim, lim)
+        ax.set_title(f"Fourier circles (embedding dim {dim})")
+        ax.set_xlabel("real")
+        ax.set_ylabel("imag")
+        savefig(os.path.join(outdir, f"09_fourier_circles_dim_{dim}.png"))
+
+
 def main():
     ckpt_path = find_checkpoint()
     outdir = os.path.join(os.path.dirname(ckpt_path), "viz")
@@ -229,6 +293,8 @@ def main():
     plot_c_slices(model, p, outdir, device)
     plot_embedding_geometry(model, outdir, p)
     plot_accuracy_vs_c(model, p, outdir, device)
+    plot_embedding_fourier(model, outdir)
+    plot_fourier_circles(model, outdir)
 
     print(f"Loaded checkpoint: {ckpt_path}")
     print(f"Saved figures to: {outdir}")

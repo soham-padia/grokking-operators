@@ -296,6 +296,49 @@ def plot_embedding_fourier(model, outdir, p):
         plt.ylabel("magnitude")
         savefig(os.path.join(outdir, f"09_fft_dim_{dim}.png"))
 
+def plot_fourier_circles(model, outdir):
+    E = model.tok_emb.weight.detach().to("cpu").float()  # [p,d]
+    var = E.var(dim=0)
+    top = torch.topk(var, k=min(4, E.shape[1])).indices.tolist()
+
+    for dim in top:
+        sig = E[:, dim] - E[:, dim].mean()
+        coeff = torch.fft.rfft(sig)
+        mags = torch.abs(coeff)
+        phases = torch.angle(coeff)
+
+        n_keep = min(8, max(0, coeff.shape[0] - 1))
+        if n_keep == 0:
+            continue
+        non_dc = torch.arange(1, coeff.shape[0])
+        top_h = non_dc[torch.topk(mags[1:], k=n_keep).indices]
+
+        plt.figure(figsize=(6, 6))
+        ax = plt.gca()
+        ax.set_aspect("equal", adjustable="box")
+        ax.axhline(0.0, linewidth=0.8)
+        ax.axvline(0.0, linewidth=0.8)
+
+        max_r = float(mags[top_h].max().item()) if top_h.numel() > 0 else 1.0
+        lim = max(1e-6, 1.2 * max_r)
+
+        for k in top_h.tolist():
+            r = float(mags[k].item())
+            th = float(phases[k].item())
+            x = r * math.cos(th)
+            y = r * math.sin(th)
+            ax.add_patch(plt.Circle((0.0, 0.0), r, fill=False, linewidth=0.8, alpha=0.18))
+            ax.plot([0.0, x], [0.0, y], linewidth=1.4)
+            ax.scatter([x], [y], s=18)
+            ax.text(x, y, f" k={k}", fontsize=8)
+
+        ax.set_xlim(-lim, lim)
+        ax.set_ylim(-lim, lim)
+        ax.set_title(f"Fourier circles (embedding dim {dim})")
+        ax.set_xlabel("real")
+        ax.set_ylabel("imag")
+        savefig(os.path.join(outdir, f"11_fourier_circles_dim_{dim}.png"))
+
 
 # ---- Attention visualization (one layer only; good enough for p=97 demo)
 def plot_attention_examples(model, outdir, device, examples, layer_idx=0):
@@ -368,6 +411,7 @@ def main():
 
     # 5) FFT / frequency analysis on embedding dims
     plot_embedding_fourier(model, outdir, p)
+    plot_fourier_circles(model, outdir)
 
     # 6) Attention examples (works best if n_layers=1)
     examples = [(0, 0), (1, 2), (10, 20), (40, 70), (96, 96)]
