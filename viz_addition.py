@@ -2,6 +2,8 @@ import os
 import math
 import torch
 import torch.nn as nn
+import matplotlib
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
 
@@ -95,6 +97,93 @@ def fft_energy_1d(signal):
     mag = torch.abs(spec)
     return mag
 
+def _try_load_state_dict(model, state_dict):
+    try:
+        model.load_state_dict(state_dict)
+        return True
+    except RuntimeError:
+        pass
+
+    if not any(k.startswith("_orig_mod.") for k in state_dict.keys()):
+        sd2 = {f"_orig_mod.{k}": v for k, v in state_dict.items()}
+        try:
+            model.load_state_dict(sd2)
+            return True
+        except RuntimeError:
+            pass
+
+    if any(k.startswith("_orig_mod.") for k in state_dict.keys()):
+        sd3 = {k.replace("_orig_mod.", "", 1): v for k, v in state_dict.items()}
+        try:
+            model.load_state_dict(sd3)
+            return True
+        except RuntimeError:
+            pass
+
+    return False
+    
+@torch.no_grad()
+def forward_with_attention(model, x, layer_idx=0):
+    """
+    Run TinyTransformer forward but capture per-head attention weights
+    from encoder layer `layer_idx`.
+
+    Returns:
+      logits: [B, p]
+      attn_w: [B, n_heads, T, T]  (T=2 here)
+    """
+    model.eval()
+
+    # Embedding
+    h = model.tok_emb(x) + model.pos_emb  # [B,T,D]
+
+    attn_w_captured = None
+
+    # Manually run TransformerEncoder layers
+    layers = model.encoder.layers
+    for i, layer in enumerate(layers):
+        # This matches your training config: norm_first=True, batch_first=True
+        if layer.norm_first:
+            # Self-attention block
+            src2 = layer.norm1(h)
+            attn_out, attn_w = layer.self_attn(
+                src2, src2, src2,
+                need_weights=True,
+                average_attn_weights=False,  # keep per-head
+            )
+            h = h + layer.dropout1(attn_out)
+
+            if i == layer_idx:
+                attn_w_captured = attn_w  # [B, heads, T, T]
+
+            # Feedforward block
+            src2 = layer.norm2(h)
+            ff = layer.linear2(layer.dropout(layer.activation(layer.linear1(src2))))
+            h = h + layer.dropout2(ff)
+
+        else:
+            # Included for completeness (you aren't using norm_first=False)
+            attn_out, attn_w = layer.self_attn(
+                h, h, h,
+                need_weights=True,
+                average_attn_weights=False,
+            )
+            h = layer.norm1(h + layer.dropout1(attn_out))
+
+            if i == layer_idx:
+                attn_w_captured = attn_w
+
+            ff = layer.linear2(layer.dropout(layer.activation(layer.linear1(h))))
+            h = layer.norm2(h + layer.dropout2(ff))
+
+    # Your model head
+    h = model.ln(h[:, -1, :])      # [B,D] take last token
+    logits = model.head(h)         # [B,p]
+
+    if attn_w_captured is None:
+        raise ValueError(f"layer_idx={layer_idx} out of range for n_layers={len(layers)}")
+
+    return logits, attn_w_captured
 
 # ----------------------------
 # Plots
@@ -209,46 +298,32 @@ def plot_embedding_fourier(model, outdir, p):
 
 
 # ---- Attention visualization (one layer only; good enough for p=97 demo)
-def plot_attention_examples(model, outdir, device, examples):
+def plot_attention_examples(model, outdir, device, examples, layer_idx=0):
     """
-    We’ll hook the self-attn weights from the TransformerEncoderLayer.
-    PyTorch's TransformerEncoderLayer does not expose attn weights by default,
-    so we re-run a manual MultiheadAttention pass using the layer's modules.
-    This works reliably for 1-layer models (your setup).
+    Plots per-head attention weights from encoder layer `layer_idx`
+    for a few (a,b) examples.
     """
-    if len(model.encoder.layers) != 1:
-        # Keep it simple; for multi-layer we can extend later.
-        with open(os.path.join(outdir, "attention_note.txt"), "w") as f:
-            f.write("Attention plots implemented for n_layers=1. Reduce layers or ask me to extend.\n")
-        return
-
-    layer = model.encoder.layers[0]
-    mha = layer.self_attn
-
-    # Token+pos embeddings
-    tok_emb = model.tok_emb
-    pos_emb = model.pos_emb
+    n_layers = len(model.encoder.layers)
+    if not (0 <= layer_idx < n_layers):
+        raise ValueError(f"layer_idx must be in [0, {n_layers-1}], got {layer_idx}")
 
     for k, (a, b) in enumerate(examples):
         x = torch.tensor([[a, b]], dtype=torch.long, device=device)  # [1,2]
-        h = tok_emb(x) + pos_emb  # [1,2,d]
 
-        # MultiheadAttention expects [B, T, D] if batch_first=True
-        attn_out, attn_w = mha(h, h, h, need_weights=True, average_attn_weights=False)
-        # attn_w: [B, n_heads, T, T]
+        _, attn_w = forward_with_attention(model, x, layer_idx=layer_idx)
+        # attn_w: [B, heads, T, T]
         aw = attn_w[0].detach().to("cpu").float()  # [heads,2,2]
 
-        # Plot per-head attention
         n_heads = aw.shape[0]
         plt.figure(figsize=(2.5 * n_heads, 2.5))
         for hi in range(n_heads):
             plt.subplot(1, n_heads, hi + 1)
             plt.imshow(aw[hi].numpy(), vmin=0, vmax=1)
-            plt.title(f"head {hi}")
+            plt.title(f"layer {layer_idx} head {hi}")
             plt.xticks([0, 1], ["a", "b"])
             plt.yticks([0, 1], ["a", "b"])
         plt.suptitle(f"Attention weights for input (a={a}, b={b})")
-        savefig(os.path.join(outdir, f"10_attention_example_{k}_a{a}_b{b}.png"))
+        savefig(os.path.join(outdir, f"10_attn_L{layer_idx}_ex{k}_a{a}_b{b}.png"))
 
 
 def main():
@@ -257,7 +332,7 @@ def main():
     ensure_dir(outdir)
 
     device = get_device()
-    ckpt = torch.load(ckpt_path, map_location="cpu")
+    ckpt = torch.load(ckpt_path, map_location=device)
     cfg = ckpt["cfg"]
     history = ckpt.get("history", None)
 
@@ -272,7 +347,9 @@ def main():
         dropout=cfg["dropout"],
     ).to(device)
 
-    model.load_state_dict(ckpt["state_dict"])
+    ok = _try_load_state_dict(model, ckpt["state_dict"])
+    if not ok:
+        raise RuntimeError("Could not load state_dict (compiled/uncompiled mismatch or arch changed).")
     model.eval()
 
     # 1) Learning curves
@@ -294,7 +371,8 @@ def main():
 
     # 6) Attention examples (works best if n_layers=1)
     examples = [(0, 0), (1, 2), (10, 20), (40, 70), (96, 96)]
-    plot_attention_examples(model, outdir, device, examples)
+    plot_attention_examples(model, outdir, device, examples, layer_idx=0)
+    plot_attention_examples(model, outdir, device, examples, layer_idx=len(model.encoder.layers)-1)
 
     print(f"Saved figures to: {outdir}")
 

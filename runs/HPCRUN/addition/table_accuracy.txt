@@ -1,0 +1,2 @@
+Full-table accuracy: 1.000000
+Chance: 0.010309

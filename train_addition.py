@@ -15,15 +15,20 @@ class Config:
 
     train_frac: float = 0.3
 
-    d_model: int = 64
-    n_heads: int = 2
-    n_layers: int = 1
+    d_model: int = 1024
+    n_heads: int = 4
+    n_layers: int = 4
     dropout: float = 0.0
 
     lr: float = 1e-3
     weight_decay: float = 1e-1
     steps: int = 200_000
-    eval_every: int = 1000
+    eval_every: int = 10000
+
+    # training
+    batch_size: int = 2048          # minibatch size (capped at n_train)
+    use_amp: bool = True            # mixed precision on CUDA
+    use_compile: bool = True        # torch.compile on CUDA (PyTorch 2.x)
 
 
 def get_device() -> torch.device:
@@ -51,15 +56,63 @@ def save_checkpoint(path, model, opt, cfg, history):
         path,
     )
 
+
+def _try_load_state_dict(model, state_dict):
+    """
+    Robustly load state_dict whether:
+      - checkpoint was saved from compiled model (keys start with '_orig_mod.')
+      - checkpoint was saved from normal model
+      - current model is compiled or normal
+    """
+    # 1) direct attempt
+    try:
+        model.load_state_dict(state_dict)
+        return True
+    except RuntimeError:
+        pass
+
+    # 2) if ckpt keys are uncompiled but model is compiled, add _orig_mod.
+    if not any(k.startswith("_orig_mod.") for k in state_dict.keys()):
+        sd2 = {f"_orig_mod.{k}": v for k, v in state_dict.items()}
+        try:
+            model.load_state_dict(sd2)
+            return True
+        except RuntimeError:
+            pass
+
+    # 3) if ckpt keys are compiled but model is uncompiled, strip _orig_mod.
+    if any(k.startswith("_orig_mod.") for k in state_dict.keys()):
+        sd3 = {k.replace("_orig_mod.", "", 1): v for k, v in state_dict.items()}
+        try:
+            model.load_state_dict(sd3)
+            return True
+        except RuntimeError:
+            pass
+
+    return False
+
+
 def load_checkpoint(path, model, opt, device):
     ckpt = torch.load(path, map_location=device)
 
-    model.load_state_dict(ckpt["state_dict"])
+    ok = _try_load_state_dict(model, ckpt["state_dict"])
+    if not ok:
+        raise RuntimeError(
+            "Checkpoint state_dict could not be loaded. "
+            "This usually means the model architecture changed "
+            "(d_model/n_layers/n_heads/etc.) or keys are incompatible."
+        )
 
     if opt is not None and "opt_state" in ckpt:
-        opt.load_state_dict(ckpt["opt_state"])
+        try:
+            opt.load_state_dict(ckpt["opt_state"])
+        except Exception:
+            # Optimizer state can fail to load if you changed params; keep going.
+            pass
 
-    history = ckpt.get("history", {"step": [], "train_acc": [], "test_acc": [], "loss": []})
+    history = ckpt.get(
+        "history", {"step": [], "train_acc": [], "test_acc": [], "loss": []}
+    )
     start_step = history["step"][-1] if history["step"] else 0
 
     return start_step, history
@@ -130,24 +183,48 @@ def main():
     model = TinyTransformer(cfg.p, cfg.d_model, cfg.n_heads, cfg.n_layers, cfg.dropout).to(device)
     opt = torch.optim.AdamW(model.parameters(), lr=cfg.lr, weight_decay=cfg.weight_decay)
 
-    ckpt_path = "runs/addition_p97/checkpoint.pt"
+    # AMP setup (new API)
+    use_amp = cfg.use_amp and (device.type == "cuda")
+    scaler = torch.amp.GradScaler("cuda", enabled=use_amp)
 
+    ckpt_path = "runs/addition_p97/checkpoint.pt"
     history = {"step": [], "train_acc": [], "test_acc": [], "loss": []}
     start_step = 0
 
+    # Load checkpoint BEFORE compile to avoid key mismatch
     if os.path.exists(ckpt_path):
         start_step, history = load_checkpoint(ckpt_path, model, opt, device)
         print(f"Resuming from step {start_step}")
 
+    # Optional compilation for speed (CUDA only) AFTER loading
+    if cfg.use_compile and device.type == "cuda":
+        model = torch.compile(model)
+
+    n_train = x_train.size(0)
+    batch_size = min(cfg.batch_size, n_train)
+
     pbar = tqdm(range(start_step + 1, cfg.steps + 1))
     for step in pbar:
         model.train()
-        logits = model(x_train)  # FULL-BATCH
-        loss = F.cross_entropy(logits, y_train)
+
+        idx = torch.randint(0, n_train, (batch_size,), device=device)
+        xb = x_train[idx]
+        yb = y_train[idx]
 
         opt.zero_grad(set_to_none=True)
-        loss.backward()
-        opt.step()
+
+        if use_amp:
+            with torch.amp.autocast("cuda", dtype=torch.float16, enabled=use_amp):
+                logits = model(xb)
+                loss = F.cross_entropy(logits, yb)
+            scaler.scale(loss).backward()
+            scaler.step(opt)
+            scaler.update()
+        else:
+            logits = model(xb)
+            loss = F.cross_entropy(logits, yb)
+            loss.backward()
+            opt.step()
 
         if step % cfg.eval_every == 0:
             train_acc = accuracy(model, x_train, y_train)
@@ -159,7 +236,9 @@ def main():
             history["loss"].append(loss.item())
 
             save_checkpoint(ckpt_path, model, opt, cfg, history)
-            pbar.set_description(f"step={step} loss={loss.item():.4f} train={train_acc:.3f} test={test_acc:.3f}")
+            pbar.set_description(
+                f"step={step} loss={loss.item():.4f} train={train_acc:.3f} test={test_acc:.3f}"
+            )
             print(f"[saved] {ckpt_path}")
 
     print("Done.")
