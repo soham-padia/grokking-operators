@@ -31,6 +31,10 @@ class Config:
     eval_every: int = 2000
     eval_batches: int = 50  # accuracy estimate batches
 
+    # training speed
+    use_amp: bool = True
+    use_compile: bool = True
+
 def save_checkpoint(path, model, opt, cfg, history):
     os.makedirs(os.path.dirname(path), exist_ok=True)
     torch.save(
@@ -46,10 +50,15 @@ def save_checkpoint(path, model, opt, cfg, history):
 def load_checkpoint(path, model, opt, device):
     ckpt = torch.load(path, map_location=device)
 
-    model.load_state_dict(ckpt["state_dict"])
+    ok = _try_load_state_dict(model, ckpt["state_dict"])
+    if not ok:
+        raise RuntimeError("Checkpoint state_dict could not be loaded.")
 
     if opt is not None and "opt_state" in ckpt:
-        opt.load_state_dict(ckpt["opt_state"])
+        try:
+            opt.load_state_dict(ckpt["opt_state"])
+        except Exception:
+            pass
 
     history = ckpt.get("history", {"step": [], "train_acc": [], "test_acc": [], "loss": []})
     start_step = history["step"][-1] if history.get("step") else 0
@@ -69,16 +78,30 @@ def set_seed(seed: int):
     torch.manual_seed(seed)
 
 
-def save_checkpoint(path, model, cfg, history):
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    torch.save(
-        {
-            "state_dict": model.state_dict(),
-            "cfg": cfg.__dict__,
-            "history": history,
-        },
-        path,
-    )
+def _try_load_state_dict(model, state_dict):
+    try:
+        model.load_state_dict(state_dict)
+        return True
+    except RuntimeError:
+        pass
+
+    if not any(k.startswith("_orig_mod.") for k in state_dict.keys()):
+        sd2 = {f"_orig_mod.{k}": v for k, v in state_dict.items()}
+        try:
+            model.load_state_dict(sd2)
+            return True
+        except RuntimeError:
+            pass
+
+    if any(k.startswith("_orig_mod.") for k in state_dict.keys()):
+        sd3 = {k.replace("_orig_mod.", "", 1): v for k, v in state_dict.items()}
+        try:
+            model.load_state_dict(sd3)
+            return True
+        except RuntimeError:
+            pass
+
+    return False
 
 
 # ----------------------------
@@ -243,20 +266,39 @@ def main():
     history = {"step": [], "train_acc": [], "test_acc": [], "loss": []}
     start_step = 0
 
+    if device.type == "cuda":
+        torch.backends.cuda.matmul.allow_tf32 = True
+        torch.backends.cudnn.allow_tf32 = True
+        torch.backends.cudnn.benchmark = True
+
+    use_amp = cfg.use_amp and (device.type == "cuda")
+    scaler = torch.amp.GradScaler("cuda", enabled=use_amp)
+
     if os.path.exists(ckpt_path):
         start_step, history = load_checkpoint(ckpt_path, model, opt, device)
         print(f"Resuming from step {start_step}")
+
+    if cfg.use_compile and device.type == "cuda":
+        model = torch.compile(model)
 
     pbar = tqdm(range(start_step + 1, cfg.steps + 1))
     for step in pbar:
         model.train()
         xb, yb = batch_from_tensor_dataset(x_train, y_train, cfg.batch_size, device)
-        logits = model(xb)
-        loss = F.cross_entropy(logits, yb)
-
         opt.zero_grad(set_to_none=True)
-        loss.backward()
-        opt.step()
+
+        if use_amp:
+            with torch.amp.autocast("cuda", dtype=torch.float16, enabled=use_amp):
+                logits = model(xb)
+                loss = F.cross_entropy(logits, yb)
+            scaler.scale(loss).backward()
+            scaler.step(opt)
+            scaler.update()
+        else:
+            logits = model(xb)
+            loss = F.cross_entropy(logits, yb)
+            loss.backward()
+            opt.step()
 
         if step % cfg.eval_every == 0:
             # Full-dataset accuracy (chunked); stable and paper-friendly

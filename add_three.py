@@ -29,6 +29,10 @@ class Config:
     # fast eval instead of full pass
     eval_batches: int = 10
 
+    # training speed
+    use_amp: bool = True
+    use_compile: bool = True
+
 
 def get_device() -> torch.device:
     if torch.backends.mps.is_available():
@@ -43,9 +47,60 @@ def set_seed(seed: int):
     torch.manual_seed(seed)
 
 
-def save_checkpoint(path, model, cfg, history):
+def save_checkpoint(path, model, opt, cfg, history):
     os.makedirs(os.path.dirname(path), exist_ok=True)
-    torch.save({"state_dict": model.state_dict(), "cfg": cfg.__dict__, "history": history}, path)
+    torch.save(
+        {
+            "state_dict": model.state_dict(),
+            "opt_state": opt.state_dict(),
+            "cfg": cfg.__dict__,
+            "history": history,
+        },
+        path,
+    )
+
+
+def _try_load_state_dict(model, state_dict):
+    try:
+        model.load_state_dict(state_dict)
+        return True
+    except RuntimeError:
+        pass
+
+    if not any(k.startswith("_orig_mod.") for k in state_dict.keys()):
+        sd2 = {f"_orig_mod.{k}": v for k, v in state_dict.items()}
+        try:
+            model.load_state_dict(sd2)
+            return True
+        except RuntimeError:
+            pass
+
+    if any(k.startswith("_orig_mod.") for k in state_dict.keys()):
+        sd3 = {k.replace("_orig_mod.", "", 1): v for k, v in state_dict.items()}
+        try:
+            model.load_state_dict(sd3)
+            return True
+        except RuntimeError:
+            pass
+
+    return False
+
+
+def load_checkpoint(path, model, opt, device):
+    ckpt = torch.load(path, map_location=device)
+    ok = _try_load_state_dict(model, ckpt["state_dict"])
+    if not ok:
+        raise RuntimeError("Checkpoint state_dict could not be loaded.")
+
+    if opt is not None and "opt_state" in ckpt:
+        try:
+            opt.load_state_dict(ckpt["opt_state"])
+        except Exception:
+            pass
+
+    history = ckpt.get("history", {"step": [], "train_acc": [], "test_acc": [], "loss": []})
+    start_step = history["step"][-1] if history["step"] else 0
+    return start_step, history
 
 
 def in_train_split(a: int, b: int, c: int, p: int, train_frac: float, seed: int) -> bool:
@@ -193,17 +248,41 @@ def main():
     opt = torch.optim.AdamW(model.parameters(), lr=cfg.lr, weight_decay=cfg.weight_decay)
 
     history = {"step": [], "train_acc": [], "test_acc": [], "loss": []}
+    start_step = 0
 
-    pbar = tqdm(range(1, cfg.steps + 1))
+    if device.type == "cuda":
+        torch.backends.cuda.matmul.allow_tf32 = True
+        torch.backends.cudnn.allow_tf32 = True
+        torch.backends.cudnn.benchmark = True
+
+    use_amp = cfg.use_amp and (device.type == "cuda")
+    scaler = torch.amp.GradScaler("cuda", enabled=use_amp)
+
+    if os.path.exists(ckpt_path):
+        start_step, history = load_checkpoint(ckpt_path, model, opt, device)
+        print(f"Resuming from step {start_step}")
+
+    if cfg.use_compile and device.type == "cuda":
+        model = torch.compile(model)
+
+    pbar = tqdm(range(start_step + 1, cfg.steps + 1))
     for step in pbar:
         model.train()
         xb, yb = batch_from_dataset(x_train, y_train, cfg.batch_size, device)
-        logits = model(xb)
-        loss = F.cross_entropy(logits, yb)
-
         opt.zero_grad(set_to_none=True)
-        loss.backward()
-        opt.step()
+
+        if use_amp:
+            with torch.amp.autocast("cuda", dtype=torch.float16, enabled=use_amp):
+                logits = model(xb)
+                loss = F.cross_entropy(logits, yb)
+            scaler.scale(loss).backward()
+            scaler.step(opt)
+            scaler.update()
+        else:
+            logits = model(xb)
+            loss = F.cross_entropy(logits, yb)
+            loss.backward()
+            opt.step()
 
         if step % cfg.eval_every == 0:
             train_acc = sampled_accuracy(model, x_train, y_train, batch_size=4096, n_batches=cfg.eval_batches, device=device)
@@ -214,7 +293,7 @@ def main():
             history["test_acc"].append(test_acc)
             history["loss"].append(loss.item())
 
-            save_checkpoint(ckpt_path, model, cfg, history)
+            save_checkpoint(ckpt_path, model, opt, cfg, history)
             pbar.set_description(f"step={step} loss={loss.item():.4f} train={train_acc:.3f} test={test_acc:.3f}")
             print(f"[saved] {ckpt_path}")
 
