@@ -10,12 +10,14 @@
 #SBATCH --error=/home/padia.so/Workspace/grokking-operators/logs/%x-%j.err
 
 set -euo pipefail
-source ~/.bashrc
-source /home/padia.so/Workspace/grokking-operators/.venv/bin/activate
 
-mkdir -p logs
+PROJECT_DIR="/home/padia.so/Workspace/grokking-operators"
+PYTHON_BIN="${PROJECT_DIR}/.venv/bin/python"
+
+mkdir -p "${PROJECT_DIR}/logs"
+
 echo "Host: $(hostname)"
-echo "Python: $(which python)"
-python -V
+echo "Python: ${PYTHON_BIN}"
+"${PYTHON_BIN}" -V
 nvidia-smi || true
-python train_addpow.py
+"${PYTHON_BIN}" -u "${PROJECT_DIR}/train_addpow.py"
