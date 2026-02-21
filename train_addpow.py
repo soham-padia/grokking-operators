@@ -34,7 +34,7 @@ class Config:
 
     # training speed
     use_amp: bool = True
-    use_compile: bool = True
+    use_compile: bool = False
 
 def save_checkpoint(path, model, opt, cfg, history):
     os.makedirs(os.path.dirname(path), exist_ok=True)

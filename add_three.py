@@ -32,7 +32,7 @@ class Config:
 
     # training speed
     use_amp: bool = True
-    use_compile: bool = True
+    use_compile: bool = False
 
 
 def get_device() -> torch.device:

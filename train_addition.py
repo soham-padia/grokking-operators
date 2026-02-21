@@ -29,7 +29,7 @@ class Config:
     # training
     batch_size: int = 2048          # minibatch size (capped at n_train)
     use_amp: bool = True            # mixed precision on CUDA
-    use_compile: bool = True        # torch.compile on CUDA (PyTorch 2.x)
+    use_compile: bool = False       # disabled on HPC: avoids Triton/Inductor compile
 
 
 def get_device() -> torch.device:
