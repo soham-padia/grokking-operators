@@ -1,5 +1,6 @@
 import os
 import random
+import sysconfig
 from dataclasses import dataclass
 
 import torch
@@ -45,6 +46,13 @@ def get_device() -> torch.device:
 def set_seed(seed: int):
     random.seed(seed)
     torch.manual_seed(seed)
+
+
+def can_use_torch_compile() -> bool:
+    py_include = sysconfig.get_paths().get("include")
+    if not py_include:
+        return False
+    return os.path.exists(os.path.join(py_include, "Python.h"))
 
 
 def save_checkpoint(path, model, opt, cfg, history):
@@ -263,7 +271,10 @@ def main():
         print(f"Resuming from step {start_step}")
 
     if cfg.use_compile and device.type == "cuda":
-        model = torch.compile(model)
+        if can_use_torch_compile():
+            model = torch.compile(model)
+        else:
+            print("torch.compile disabled: Python.h not found in this environment.")
 
     pbar = tqdm(range(start_step + 1, cfg.steps + 1))
     for step in pbar:
