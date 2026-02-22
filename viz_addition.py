@@ -296,6 +296,52 @@ def plot_embedding_fourier(model, outdir, p):
         plt.ylabel("magnitude")
         savefig(os.path.join(outdir, f"09_fft_dim_{dim}.png"))
 
+def plot_embedding_circuit_gallery(model, outdir, p):
+    E = model.tok_emb.weight.detach().to("cpu").float()  # [p,d]
+    var = E.var(dim=0)
+    n_dims = min(6, E.shape[1])
+    dims = torch.topk(var, k=n_dims).indices.tolist()
+    X = E[:, dims]
+    X = (X - X.mean(dim=0, keepdim=True)) / (X.std(dim=0, keepdim=True) + 1e-8)
+
+    colors = torch.linspace(0.0, 1.0, p).numpy()
+    cmap = plt.get_cmap("viridis")
+    k = X.shape[1]
+
+    fig = plt.figure(figsize=(3.0 + 2.1 * k, 1.8 * k), facecolor="black")
+    gs = fig.add_gridspec(k, k + 1, width_ratios=[1.4] + [1.0] * k, wspace=0.2, hspace=0.25)
+
+    for i in range(k):
+        ax = fig.add_subplot(gs[i, 0])
+        ax.set_facecolor("black")
+        y = X[:, i].numpy()
+        ax.scatter(range(p), y, c=colors, cmap=cmap, s=10, linewidths=0)
+        ax.axhline(0.0, color="white", alpha=0.25, linewidth=0.8)
+        ax.set_xlim(0, p - 1)
+        ax.set_xticks([])
+        ax.set_yticks([])
+        for spine in ax.spines.values():
+            spine.set_visible(False)
+        ax.set_title(f"dim {dims[i]}", color="white", fontsize=8, pad=2)
+
+    for i in range(k):
+        yi = X[:, i].numpy()
+        for j in range(k):
+            ax = fig.add_subplot(gs[i, j + 1])
+            ax.set_facecolor("black")
+            xj = X[:, j].numpy()
+            ax.scatter(xj, yi, c=colors, cmap=cmap, s=10, linewidths=0)
+            ax.axhline(0.0, color="white", alpha=0.25, linewidth=0.8)
+            ax.axvline(0.0, color="white", alpha=0.25, linewidth=0.8)
+            ax.set_xticks([])
+            ax.set_yticks([])
+            for spine in ax.spines.values():
+                spine.set_visible(False)
+
+    fig.suptitle("Circuit-style embedding phase portraits", color="white", fontsize=12, y=0.995)
+    fig.savefig(os.path.join(outdir, "12_embedding_circuit_gallery.png"), dpi=220, bbox_inches="tight", facecolor=fig.get_facecolor())
+    plt.close(fig)
+
 def plot_fourier_circles(model, outdir):
     E = model.tok_emb.weight.detach().to("cpu").float()  # [p,d]
     var = E.var(dim=0)
@@ -338,6 +384,123 @@ def plot_fourier_circles(model, outdir):
         ax.set_xlabel("real")
         ax.set_ylabel("imag")
         savefig(os.path.join(outdir, f"11_fourier_circles_dim_{dim}.png"))
+
+@torch.no_grad()
+def get_ffn_activations_for_sweep(model, p, device, layer_idx=0, fixed_b=0, sweep_over="a"):
+    """
+    Capture FFN hidden activations (after GELU(linear1)) for one encoder layer.
+    Sweep one input while fixing the other:
+      - sweep_over='a': (a=0..p-1, b=fixed_b)
+      - sweep_over='b': (a=fixed_b, b=0..p-1)
+    Returns tensor of shape [p, d_ff] from the last token position.
+    """
+    vals = torch.arange(p, device=device)
+    if sweep_over == "a":
+        a = vals
+        b = torch.full_like(vals, fixed_b)
+    else:
+        a = torch.full_like(vals, fixed_b)
+        b = vals
+    x = torch.stack([a, b], dim=1)  # [p,2]
+
+    h = model.tok_emb(x) + model.pos_emb  # [p,2,d_model]
+    layers = model.encoder.layers
+    if not (0 <= layer_idx < len(layers)):
+        raise ValueError(f"layer_idx out of range: {layer_idx}")
+
+    captured = None
+    for i, layer in enumerate(layers):
+        if layer.norm_first:
+            src2 = layer.norm1(h)
+            attn_out, _ = layer.self_attn(
+                src2, src2, src2, need_weights=False
+            )
+            h = h + layer.dropout1(attn_out)
+
+            src2 = layer.norm2(h)
+            ff_hidden = layer.activation(layer.linear1(src2))  # [B,T,d_ff]
+            ff = layer.linear2(layer.dropout(ff_hidden))
+            h = h + layer.dropout2(ff)
+        else:
+            attn_out, _ = layer.self_attn(
+                h, h, h, need_weights=False
+            )
+            h = layer.norm1(h + layer.dropout1(attn_out))
+            ff_hidden = layer.activation(layer.linear1(h))
+            ff = layer.linear2(layer.dropout(ff_hidden))
+            h = layer.norm2(h + layer.dropout2(ff))
+
+        if i == layer_idx:
+            captured = ff_hidden[:, -1, :].detach().to("cpu").float()  # [p,d_ff]
+            break
+
+    if captured is None:
+        raise RuntimeError("Failed to capture FFN activations.")
+    return captured
+
+
+def _style_dark_axis(ax):
+    ax.set_facecolor("black")
+    ax.tick_params(colors="white", labelsize=7, length=2)
+    for spine in ax.spines.values():
+        spine.set_color((1.0, 1.0, 1.0, 0.25))
+    ax.grid(False)
+
+
+def plot_mlp_traces_and_pairgrid(model, outdir, p, device, layer_idx=0, fixed_b=0, n_neurons=7):
+    acts = get_ffn_activations_for_sweep(
+        model=model,
+        p=p,
+        device=device,
+        layer_idx=layer_idx,
+        fixed_b=fixed_b,
+        sweep_over="a",
+    )  # [p,d_ff]
+
+    var = acts.var(dim=0)
+    neuron_ids = torch.topk(var, k=min(n_neurons, acts.shape[1])).indices.tolist()
+    t = torch.arange(p).numpy()
+    colors = torch.linspace(0.0, 1.0, p).numpy()
+    cmap = plt.get_cmap("viridis")
+
+    # 1) Vertical neuron traces like the reference style
+    fig, axes = plt.subplots(len(neuron_ids), 1, figsize=(7.2, 1.8 * len(neuron_ids)), facecolor="black")
+    if len(neuron_ids) == 1:
+        axes = [axes]
+    for ax, nid in zip(axes, neuron_ids):
+        y = acts[:, nid].numpy()
+        _style_dark_axis(ax)
+        ax.scatter(t, y, c=colors, cmap=cmap, s=16, linewidths=0)
+        ax.axhline(0.0, color=(1.0, 1.0, 1.0, 0.4), linewidth=0.9)
+        ax.set_xlim(0, p - 1)
+        ax.set_xticks([])
+        ax.set_yticks([])
+        ax.set_title(f"Layer {layer_idx} FFN neuron {nid}", color="white", fontsize=8, pad=2)
+    fig.suptitle(f"MLP traces: sweep a=0..{p-1}, b={fixed_b}", color="white", fontsize=12, y=0.995)
+    fig.savefig(os.path.join(outdir, "13_mlp_traces_layer0_b0.png"), dpi=220, bbox_inches="tight", facecolor=fig.get_facecolor())
+    plt.close(fig)
+
+    # 2) 7x7 pairwise scatter grid
+    n = len(neuron_ids)
+    fig, axes = plt.subplots(n, n, figsize=(2.0 * n, 2.0 * n), facecolor="black")
+    for i in range(n):
+        yi = acts[:, neuron_ids[i]].numpy()
+        for j in range(n):
+            xj = acts[:, neuron_ids[j]].numpy()
+            ax = axes[i, j]
+            _style_dark_axis(ax)
+            ax.scatter(xj, yi, c=colors, cmap=cmap, s=12, linewidths=0)
+            ax.axhline(0.0, color=(1.0, 1.0, 1.0, 0.3), linewidth=0.8)
+            ax.axvline(0.0, color=(1.0, 1.0, 1.0, 0.3), linewidth=0.8)
+            ax.set_xticks([])
+            ax.set_yticks([])
+            if i == n - 1:
+                ax.set_xlabel(str(neuron_ids[j]), color="white", fontsize=7)
+            if j == 0:
+                ax.set_ylabel(str(neuron_ids[i]), color="white", fontsize=7)
+    fig.suptitle("7x7 neuron pair phase portraits (same sweep coloring)", color="white", fontsize=12, y=0.995)
+    fig.savefig(os.path.join(outdir, "14_mlp_pairgrid_layer0_b0.png"), dpi=220, bbox_inches="tight", facecolor=fig.get_facecolor())
+    plt.close(fig)
 
 
 # ---- Attention visualization (one layer only; good enough for p=97 demo)
@@ -412,6 +575,8 @@ def main():
     # 5) FFT / frequency analysis on embedding dims
     plot_embedding_fourier(model, outdir, p)
     plot_fourier_circles(model, outdir)
+    plot_embedding_circuit_gallery(model, outdir, p)
+    plot_mlp_traces_and_pairgrid(model, outdir, p, device, layer_idx=0, fixed_b=0, n_neurons=7)
 
     # 6) Attention examples (works best if n_layers=1)
     examples = [(0, 0), (1, 2), (10, 20), (40, 70), (96, 96)]
