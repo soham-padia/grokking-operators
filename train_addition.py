@@ -23,7 +23,7 @@ class Config:
 
     lr: float = 1e-3
     weight_decay: float = 1e-1
-    steps: int = 1_000_000
+    steps: int = 5_000_000
     eval_every: int = 10000
 
     # training

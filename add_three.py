@@ -24,7 +24,7 @@ class Config:
 
     lr: float = 3e-4
     weight_decay: float = 1e-1
-    steps: int = 1_000_000
+    steps: int = 5_000_000
     eval_every: int = 2000
 
     # fast eval instead of full pass
