@@ -372,6 +372,15 @@ def _style_dark_axis(ax):
     ax.grid(False)
 
 
+def _select_neurons_by_fourier_peak(acts, n_neurons):
+    sig = acts - acts.mean(dim=0, keepdim=True)
+    mags = torch.abs(torch.fft.rfft(sig, dim=0))
+    if mags.shape[0] > 1:
+        mags = mags[1:]
+    scores = mags.max(dim=0).values
+    return torch.topk(scores, k=min(n_neurons, acts.shape[1])).indices.tolist()
+
+
 def plot_mlp_traces_and_pairgrid(model, outdir, p, device, layer_idx=0, fixed_b=0, fixed_c=0, n_neurons=7):
     acts = get_ffn_activations_for_sweep(
         model=model,
@@ -383,8 +392,7 @@ def plot_mlp_traces_and_pairgrid(model, outdir, p, device, layer_idx=0, fixed_b=
         sweep_over="a",
     )
 
-    var = acts.var(dim=0)
-    neuron_ids = torch.topk(var, k=min(n_neurons, acts.shape[1])).indices.tolist()
+    neuron_ids = _select_neurons_by_fourier_peak(acts, n_neurons=n_neurons)
     t = torch.arange(p).numpy()
     colors = torch.linspace(0.0, 1.0, p).numpy()
     cmap = plt.get_cmap("viridis")
@@ -401,7 +409,12 @@ def plot_mlp_traces_and_pairgrid(model, outdir, p, device, layer_idx=0, fixed_b=
         ax.set_xticks([])
         ax.set_yticks([])
         ax.set_title(f"Layer {layer_idx} FFN neuron {nid}", color="white", fontsize=8, pad=2)
-    fig.suptitle(f"MLP traces: sweep a=0..{p-1}, b={fixed_b}, c={fixed_c}", color="white", fontsize=12, y=0.995)
+    fig.suptitle(
+        f"MLP traces (Fourier-selected): sweep a=0..{p-1}, b={fixed_b}, c={fixed_c}, layer={layer_idx}",
+        color="white",
+        fontsize=12,
+        y=0.995,
+    )
     fig.savefig(os.path.join(outdir, "11_mlp_traces_layer0_b0_c0.png"), dpi=220, bbox_inches="tight", facecolor=fig.get_facecolor())
     plt.close(fig)
 
@@ -422,7 +435,12 @@ def plot_mlp_traces_and_pairgrid(model, outdir, p, device, layer_idx=0, fixed_b=
                 ax.set_xlabel(str(neuron_ids[j]), color="white", fontsize=7)
             if j == 0:
                 ax.set_ylabel(str(neuron_ids[i]), color="white", fontsize=7)
-    fig.suptitle("7x7 neuron pair phase portraits (same sweep coloring)", color="white", fontsize=12, y=0.995)
+    fig.suptitle(
+        "7x7 neuron pair phase portraits (Fourier-selected, same sweep coloring)",
+        color="white",
+        fontsize=12,
+        y=0.995,
+    )
     fig.savefig(os.path.join(outdir, "12_mlp_pairgrid_layer0_b0_c0.png"), dpi=220, bbox_inches="tight", facecolor=fig.get_facecolor())
     plt.close(fig)
 
@@ -459,7 +477,16 @@ def main():
     plot_embedding_fourier(model, outdir)
     plot_fourier_circles(model, outdir)
     plot_embedding_circuit_gallery(model, outdir, p)
-    plot_mlp_traces_and_pairgrid(model, outdir, p, device, layer_idx=0, fixed_b=0, fixed_c=0, n_neurons=7)
+    plot_mlp_traces_and_pairgrid(
+        model,
+        outdir,
+        p,
+        device,
+        layer_idx=len(model.encoder.layers) - 1,
+        fixed_b=0,
+        fixed_c=0,
+        n_neurons=7,
+    )
 
     print(f"Loaded checkpoint: {ckpt_path}")
     print(f"Saved figures to: {outdir}")
