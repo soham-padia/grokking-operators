@@ -14,9 +14,9 @@ runs/*
 !runs/**/
 !runs/**/viz/
 !runs/**/viz/**
+runs (1)/
+runs (2)/
 
 *.pt
 *.pth
 *.ckpt
-
-
