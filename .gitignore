@@ -10,13 +10,18 @@ __pycache__/
 .idea/
 
 # Outputs / checkpoints
-runs/*
-!runs/**/
-!runs/**/viz/
-!runs/**/viz/**
+runs/
+adv_viz/
+logs/
+sbatch/logs/
 runs (1)/
 runs (2)/
+FETCH_HEAD
 
 *.pt
 *.pth
 *.ckpt
+*.out
+*.err
+*.gif
+*.mp4

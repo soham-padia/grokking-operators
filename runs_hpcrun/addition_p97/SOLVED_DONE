@@ -1,0 +1,4 @@
+solved_step=550000
+train_acc=1.000000
+test_acc=1.000000
+consec_perfect_steps=10000
