@@ -33,52 +33,16 @@ Why this helps:
 
 ## Key Visual Results
 
-## Addition (`runs_hpcrun/addition_p97/viz`)
-
-### Error structure
-
-![Addition error map](runs_hpcrun/addition_p97/viz/05_error_map.png)
-
-### Image 10: attention examples
-
-![Addition image 10](runs_hpcrun/addition_p97/viz/10_attention_example_3_a40_b70.png)
-
-### Image 11: Fourier circles
-
-![Addition image 11](runs_hpcrun/addition_p97/viz/11_fourier_circles_dim_369.png)
-
-### Image 12: embedding circuit gallery
-
-![Addition image 12](runs_hpcrun/addition_p97/viz/12_embedding_circuit_gallery.png)
-
-### Extra mechanistic views
-
-![Addition MLP traces](runs_hpcrun/addition_p97/viz/13_mlp_traces_layer0_b0.png)
-![Addition 7x7 pair portraits](runs_hpcrun/addition_p97/viz/14_mlp_pairgrid_layer0_b0.png)
-
-## AddPow (`runs_hpcrun/addpow_p97_cmax32_tf0.2_wd0.1/viz`)
-
-### Error structure
-
-![AddPow error map c=0](runs_hpcrun/addpow_p97_cmax32_tf0.2_wd0.1/viz/05_error_map_c0.png)
-![AddPow error map c=32](runs_hpcrun/addpow_p97_cmax32_tf0.2_wd0.1/viz/05_error_map_c32.png)
-
-### Image 10: embedding circuit gallery
-
-![AddPow image 10](runs_hpcrun/addpow_p97_cmax32_tf0.2_wd0.1/viz/10_embedding_circuit_gallery.png)
-
-### Image 11: MLP traces
-
-![AddPow image 11](runs_hpcrun/addpow_p97_cmax32_tf0.2_wd0.1/viz/11_mlp_traces_layer0_b0_c0.png)
-
-### Image 12: neuron pair portraits
-
-![AddPow image 12](runs_hpcrun/addpow_p97_cmax32_tf0.2_wd0.1/viz/12_mlp_pairgrid_layer0_b0_c0.png)
-
 ## AddThree (`runs_hpcrun/add3_p97_tf0.3_wd0.1/viz`)
 
 `add_three` has not grokked yet in this run, and its behavior is much more chaotic than `addition` / `addpow`.  
 Even so, it generates very strong transformer-mechanistic visuals.
+
+### Images 10, 11, 12 (side by side)
+
+| Image 10 | Image 11 | Image 12 |
+|---|---|---|
+| ![AddThree image 10](runs_hpcrun/add3_p97_tf0.3_wd0.1/viz/10_embedding_circuit_gallery.png) | ![AddThree image 11](runs_hpcrun/add3_p97_tf0.3_wd0.1/viz/11_mlp_traces_layer0_b0_c0.png) | ![AddThree image 12](runs_hpcrun/add3_p97_tf0.3_wd0.1/viz/12_mlp_pairgrid_layer0_b0_c0.png) |
 
 ### Error structure
 
@@ -86,17 +50,32 @@ Even so, it generates very strong transformer-mechanistic visuals.
 ![AddThree error map c=48](runs_hpcrun/add3_p97_tf0.3_wd0.1/viz/05_error_map_c48.png)
 ![AddThree error map c=96](runs_hpcrun/add3_p97_tf0.3_wd0.1/viz/05_error_map_c96.png)
 
-### Image 10: embedding circuit gallery (highlight)
+## Addition (`runs_hpcrun/addition_p97/viz`)
 
-![AddThree image 10](runs_hpcrun/add3_p97_tf0.3_wd0.1/viz/10_embedding_circuit_gallery.png)
+Note: `addition` images 10/11/12 are different plot families (attention example, Fourier circles, embedding gallery).
 
-### Image 11: MLP traces
+### Images 12, 13, 14 (side by side)
 
-![AddThree image 11](runs_hpcrun/add3_p97_tf0.3_wd0.1/viz/11_mlp_traces_layer0_b0_c0.png)
+| Image 12 | Image 13 | Image 14 |
+|---|---|---|
+| ![Addition image 12](runs_hpcrun/addition_p97/viz/12_embedding_circuit_gallery.png) | ![Addition image 13](runs_hpcrun/addition_p97/viz/13_mlp_traces_layer0_b0.png) | ![Addition image 14](runs_hpcrun/addition_p97/viz/14_mlp_pairgrid_layer0_b0.png) |
 
-### Image 12: neuron pair portraits
+### Error structure
 
-![AddThree image 12](runs_hpcrun/add3_p97_tf0.3_wd0.1/viz/12_mlp_pairgrid_layer0_b0_c0.png)
+![Addition error map](runs_hpcrun/addition_p97/viz/05_error_map.png)
+
+## AddPow (`runs_hpcrun/addpow_p97_cmax32_tf0.2_wd0.1/viz`)
+
+### Images 10, 11, 12 (side by side)
+
+| Image 10 | Image 11 | Image 12 |
+|---|---|---|
+| ![AddPow image 10](runs_hpcrun/addpow_p97_cmax32_tf0.2_wd0.1/viz/10_embedding_circuit_gallery.png) | ![AddPow image 11](runs_hpcrun/addpow_p97_cmax32_tf0.2_wd0.1/viz/11_mlp_traces_layer0_b0_c0.png) | ![AddPow image 12](runs_hpcrun/addpow_p97_cmax32_tf0.2_wd0.1/viz/12_mlp_pairgrid_layer0_b0_c0.png) |
+
+### Error structure
+
+![AddPow error map c=0](runs_hpcrun/addpow_p97_cmax32_tf0.2_wd0.1/viz/05_error_map_c0.png)
+![AddPow error map c=32](runs_hpcrun/addpow_p97_cmax32_tf0.2_wd0.1/viz/05_error_map_c32.png)
 
 ## Advanced Analysis
 
