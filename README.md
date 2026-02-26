@@ -37,6 +37,7 @@ Why this helps:
 
 `add_three` has not grokked yet in this run, and its behavior is much more chaotic than `addition` / `addpow`.  
 Even so, it generates very strong transformer-mechanistic visuals.
+Result summary: `accuracy_by_c.txt` stays around `~0.30` for most `c`.
 
 ### Images 10, 11, 12 (side by side)
 
@@ -46,13 +47,14 @@ Even so, it generates very strong transformer-mechanistic visuals.
 
 ### Error structure
 
-![AddThree error map c=0](runs_hpcrun/add3_p97_tf0.3_wd0.1/viz/05_error_map_c0.png)
-![AddThree error map c=48](runs_hpcrun/add3_p97_tf0.3_wd0.1/viz/05_error_map_c48.png)
-![AddThree error map c=96](runs_hpcrun/add3_p97_tf0.3_wd0.1/viz/05_error_map_c96.png)
+| c=0 | c=48 | c=96 |
+|---|---|---|
+| ![AddThree error map c=0](runs_hpcrun/add3_p97_tf0.3_wd0.1/viz/05_error_map_c0.png) | ![AddThree error map c=48](runs_hpcrun/add3_p97_tf0.3_wd0.1/viz/05_error_map_c48.png) | ![AddThree error map c=96](runs_hpcrun/add3_p97_tf0.3_wd0.1/viz/05_error_map_c96.png) |
 
 ## Addition (`runs_hpcrun/addition_p97/viz`)
 
 Note: `addition` images 10/11/12 are different plot families (attention example, Fourier circles, embedding gallery).
+Result summary: `Full-table accuracy = 1.000000`.
 
 ### Images 12, 13, 14 (side by side)
 
@@ -62,9 +64,12 @@ Note: `addition` images 10/11/12 are different plot families (attention example,
 
 ### Error structure
 
-![Addition error map](runs_hpcrun/addition_p97/viz/05_error_map.png)
+| Error map |
+|---|
+| ![Addition error map](runs_hpcrun/addition_p97/viz/05_error_map.png) |
 
 ## AddPow (`runs_hpcrun/addpow_p97_cmax32_tf0.2_wd0.1/viz`)
+Result summary: `accuracy_by_c.txt` is `1.000000` for all shown `c=0..32`.
 
 ### Images 10, 11, 12 (side by side)
 
@@ -74,24 +79,9 @@ Note: `addition` images 10/11/12 are different plot families (attention example,
 
 ### Error structure
 
-![AddPow error map c=0](runs_hpcrun/addpow_p97_cmax32_tf0.2_wd0.1/viz/05_error_map_c0.png)
-![AddPow error map c=32](runs_hpcrun/addpow_p97_cmax32_tf0.2_wd0.1/viz/05_error_map_c32.png)
-
-## Advanced Analysis
-
-`viz_advanced_addition.py` generates higher-level diagnostics in `adv_viz/...`, including:
-
-- checkpoint trajectory PCA/UMAP
-- frequency-phase neuron atlas
-- CKA/CCA representation similarity
-- error manifold movies
-- logit Fourier decomposition
-- pair curvature/topology scores
-- Hessian sharpness trend
-- input-path probing
-- optional persistent homology (if `ripser` is installed)
-- causal patching
-- one-checkpoint feature/spatial movies
+| c=0 | c=32 |
+|---|---|
+| ![AddPow error map c=0](runs_hpcrun/addpow_p97_cmax32_tf0.2_wd0.1/viz/05_error_map_c0.png) | ![AddPow error map c=32](runs_hpcrun/addpow_p97_cmax32_tf0.2_wd0.1/viz/05_error_map_c32.png) |
 
 ## Running
 
